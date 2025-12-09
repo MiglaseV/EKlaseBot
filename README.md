@@ -1,4 +1,4 @@
-E-klase bots mācišāna. Šis ir personīgs Telegram-bots skolēnam, kas palīdz mācīties ar e-klase.lv, nekad neatdod gatavus risinājumus, bet motivē un liek domāt pašam. Galvenās funkcijas: 
+E-klase bots mācišāna. Šis ir personīgs bots skolēnam, kas palīdz mācīties ar e-klase.lv, nekad neatdod gatavus risinājumus, bet motivē un liek domāt pašam. Galvenās funkcijas: 
 • Droši pieslēdzas tavam e-klase kontam (tikai tu un bots redz paroli) 
 • Parāda šodienas un tuvāko dienu mājasdarbus • Katru dienu (vai kad vēlies) atsūta jaunākos uzdevumus • Dod motivējošus un reizēm smieklīgus tekstus latviešu valodā • Nekad neatdod gatavu atbildi — tikai gudrus mājienus un uzdod pretjautājumus 
 • Ir spēļošanas sistēma: punkti par katru pabeigtu darbu un “paldies”, līmeņi (kā spēlē!) 
