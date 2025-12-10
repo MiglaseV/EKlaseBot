@@ -1,5 +1,4 @@
-e-klase Study Helper Bot
-Telegram bot for Latvian students
+e-klase Study Helper Bot for Latvian students
 A smart, fun, and honest homework assistant that pulls your real tasks from e-klase.lv, motivates you in Latvian, and NEVER gives direct answers — only smart hints so you actually learn and level up.
 | “Learn. Win. Be proud.” — with gamification as the engine. |
 What It Does
