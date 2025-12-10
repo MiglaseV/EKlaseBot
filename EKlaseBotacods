@@ -1,78 +1,12 @@
-# bot.py
-import asyncio
-import logging
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
-from aiogram.types import Message
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.storage.memory import MemoryStorage
-
+from flask import Flask, render_template, request, session, redirect, url_for, flash
 import requests
 from bs4 import BeautifulSoup
 import random
-from datetime import datetime
 
-# ========================= CONFIG =========================
-TOKEN = "8333674415:AAFjmtAHgj-n08mg88Ai2C0afGpXc0rGsLo"          # Get from @BotFather
-# Leave empty if you want users to enter credentials via /login
-EKLASE_LOGIN = ""
-EKLASE_PASSWORD = ""
+app = Flask(__name__)
+app.secret_key = "change-this-to-something-long-and-random"  # change this!
 
-# ===========================================================
-logging.basicConfig(level=logging.INFO)
-bot = Bot(token=TOKEN)
-storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
-
-# FSM states
-class AuthState(StatesGroup):
-    waiting_login = State()
-    waiting_password = State()
-
-# In-memory user storage (use database in production)
-users = {}  # user_id -> {login, password, points, level}
-
-# ======================== E-KLASE PARSER ========================
-class EKlase:
-    def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        })
-
-    def login(self, login, password):
-        url = "https://my.e-klase.lv/Account/Login"
-        r = self.session.get(url)
-        soup = BeautifulSoup(r.text, 'html.parser')
-        token = soup.find("input", {"name": "__RequestVerificationToken"})["value"]
-
-        data = {
-            "UserName": login,
-            "Password": password,
-            "__RequestVerificationToken": token
-        }
-        resp = self.session.post(url, data=data)
-        return "mana lapa" in resp.url.lower() or resp.status_code == 200
-
-    def get_homework(self):
-        try:
-            r = self.session.get("https://my.e-klase.lv/Homework")
-            soup = BeautifulSoup(r.text, "html.parser")
-            tasks = []
-            for row in soup.select(".homework-row"):
-                date = row.select_one(".date").text.strip() if row.select_one(".date") else "No date"
-                subject = row.select_one(".subject").text.strip()
-                task = row.select_one(".description").text.strip()
-                tasks.append(f"📅 {date}\n📚 {subject}\n✏️ {task}\n")
-            return tasks if tasks else ["No new homework today! 🎉"]
-        except Exception as e:
-            logging.error(e)
-            return ["Failed to load homework 😔"]
-
-ek = EKlase()
-
-# ======================== MOTIVATION (in Latvian) ========================
+# Latvian motivational quotes
 motivations = [
     "Tu esi spējīgs uz daudz vairāk, nekā domā! 💪",
     "Katra atrisināta uzdevuma padara tevi par supervaroni 🦸‍♂️",
@@ -83,113 +17,103 @@ motivations = [
     "Mācīties = ieguldīt sevī. Tu esi labākais ieguldījums! 💰"
 ]
 
-# ======================== COMMAND HANDLERS ========================
-@dp.message(Command("start"))
-async def start(message: Message):
-    user_id = message.from_user.id
-    if user_id not in users:
-        await message.answer(
-            "Sveiks! I'm your personal e-klase study helper! 🤖\n\n"
-            "To get started, I need your e-klase credentials (100% private).\n"
-            "Type /login and follow the instructions!"
-        )
-    else:
-        data = users[user_id]
-        await message.answer(
-            f"Welcome back, champion! 🏆\n"
-            f"Level: {data['level']} | Points: {data['points']}\n\n"
-            "What shall we do today?\n"
-            "/homework – show today's tasks\n"
-            "/motivation – get inspired\n"
-            "/help – smart hints (I won't do it for you!)"
-        )
+hints = [
+    "Tell me what YOU already know about this topic. Let’s start there! 🧠",
+    "What do you think the first step could be?",
+    "Try writing your own answer – I’ll tell you if you’re on the right track 😉",
+    "Think: what did the teacher want you to learn with this task?",
+    "I’ll give you a hint, but only after you guess at least one step! 🔥"
+]
 
-@dp.message(Command("login"))
-async def login_cmd(message: Message, state: FSMContext):
-    await message.answer("Enter your e-klase username or phone number:")
-    await state.set_state(AuthState.waiting_login)
+class EKlase:
+    def __init__(self):
+        self.session = requests.Session()
 
-@dp.message(AuthState.waiting_login)
-async def get_login(message: Message, state: FSMContext):
-    await state.update_data(login=message.text)
-    await message.answer("Now enter your password (it won't be shown to anyone):")
-    await state.set_state(AuthState.waiting_password)
+    def login(self, username, password):
+        url = "https://my.e-klase.lv/Account/Login"
+        r = self.session.get(url)
+        soup = BeautifulSoup(r.text, 'html.parser')
+        token = soup.find("input", {"name": "__RequestVerificationToken"})["value"]
 
-@dp.message(AuthState.waiting_password)
-async def get_password(message: Message, state: FSMContext):
-    data = await state.get_data()
-    login = data['login']
-    password = message.text
-    user_id = message.from_user.id
-
-    await message.answer("Logging in to e-klase... ⏳")
-
-    if ek.login(login, password):
-        users[user_id] = {
-            "login": login,
-            "password": password,
-            "points": users.get(user_id, {}).get("points", 0),
-            "level": users.get(user_id, {}).get("level", 1)
+        data = {
+            "UserName": username,
+            "Password": password,
+            "__RequestVerificationToken": token
         }
-        await message.answer(
-            "✅ Successfully logged in!\n\n"
-            "You can now use /homework anytime!\n"
-            "+50 points as a bravery bonus 😉"
-        )
-        users[user_id]["points"] += 50
-        await state.clear()
-    else:
-        await message.answer("Wrong username or password 😔 Try again: /login")
+        resp = self.session.post(url, data=data, allow_redirects=True)
+        return "mana lapa" in resp.url.lower() or resp.status_code == 200
 
-@dp.message(Command("homework"))
-async def homework(message: Message):
-    user_id = message.from_user.id
-    if user_id not in users:
-        await message.answer("You need to log in first! /login")
-        return
+    def get_homework(self):
+        try:
+            r = self.session.get("https://my.e-klase.lv/Homework")
+            soup = BeautifulSoup(r.text, "html.parser")
+            tasks = []
+            for row in soup.select(".homework-row")[:10]:
+                date = row.select_one(".date").text.strip() if row.select_one(".date") else "Soon"
+                subject = row.select_one(".subject").text.strip()
+                task = row.select_one(".description").text.strip()
+                tasks.append({"date": date, "subject": subject, "task": task})
+            return tasks if tasks else [{"date": "Today", "subject": "Free day!", "task": "You earned a rest!"}]
+        except:
+            return [{"date": "Error", "subject": "Could not load", "task": "Check internet or try again later"}]
 
-    await message.answer("Loading homework... 📖")
-    tasks = ek.get_homework()
-    response = "TODAY'S & UPCOMING HOMEWORK\n\n"
-    for t in tasks[:10]:
-        response += t + "—\n"
-    response += "\nYou got this! 💪"
-    await message.answer(response)
+eklase = EKlase()
 
-@dp.message(Command("motivation"))
-async def motivation(message: Message):
-    mot = random.choice(motivations)
-    await message.answer(f"💚 {mot}")
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if "logged_in" not in session:
+        return redirect(url_for("login"))
 
-# Smart help – never gives direct answers
-@dp.message(F.text.regexp(r"(how|what|task|help|palīdz)").lower())
-async def smart_help(message: Message):
-    hints = [
-        "Tell me what YOU already know about this topic. Let's start there! 🧠",
-        "What do you think the first step could be? I'll check it for you! ✅",
-        "Try writing your own answer – I'll tell you if you're on the right track 😉",
-        "Think: what did the teacher want you to learn with this task?",
-        "I'll give you a hint, but only after you guess at least one step! 🔥"
-    ]
-    await message.answer(random.choice(hints))
+    if request.method == "POST":
+        message = request.form.get("message", "").lower()
 
-# Reward system
-@dp.message(F.text.lower().contains("thanks") | F.text.lower().contains("done") | 
-            F.text.lower().contains("paldies") | F.text.lower().contains("izdevās"))
-async def reward(message: Message):
-    user_id = message.from_user.id
-    if user_id in users:
-        users[user_id]["points"] += 10
-        if users[user_id]["points"] >= (users[user_id]["level"] * 100):
-            users[user_id]["level"] += 1
-            await message.answer(f"LEVEL UP! You're now level {users[user_id]['level']}! 🏆")
+        # Motivation
+        if any(word in message for word in ["motivation", "motiv", "iedvesma"]):
+            flash(random.choice(motivations), "motivation")
+
+        # Smart help
+        elif any(word in message for word in ["help", "how", "palīdz", "kā", "solve", "don’t know"]):
+            flash(random.choice(hints), "hint")
+
+        # Reward
+        elif any(word in message for word in ["done", "paldies", "izdevās", "finished", "thanks"]):
+            session["points"] = session.get("points", 0) + 10
+            if session["points"] >= session.get("level", 1) * 100:
+                session["level"] = session.get("level", 1) + 1
+                flash(f"LEVEL UP! You are now level {session['level']}! 🎉", "levelup")
+            else:
+                flash(f"+10 points! Total: {session['points']}", "success")
+
+        # Refresh homework
+        session["homework"] = eklase.get_homework()
+
+    return render_template(
+        "index.html",
+        homework=session.get("homework", []),
+        points=session.get("points", 0),
+        level=session.get("level", 1)
+    )
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        if eklase.login(username, password):
+            session["logged_in"] = True
+session["points"] = 50
+            session["level"] = 1
+            session["homework"] = eklase.get_homework()
+            flash("Successfully logged in! +50 starter points 🎁", "success")
+            return redirect("/")
         else:
-            await message.answer(f"+10 points! Total: {users[user_id]['points']} 💎")
+            flash("Wrong username or password", "error")
+    return render_template("login.html")
 
-# ======================== START BOT ========================
-async def main():
-    print("Bot is starting...")
-    await dp.start_polling(bot)
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
 
 if name == "__main__":
-    asyncio.run(main())
+    app.run(debug=True, host="0.0.0.0", port=5000)
