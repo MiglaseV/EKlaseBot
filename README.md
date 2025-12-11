@@ -5,9 +5,6 @@ Ievadi savus e-klase.lv datus vienreiz — un saņem īstus mājasdarbus, motiv�
 
 | «Mācies. Uzvari. Lepojies.» — ar spēļošanu kā dzinuli |
 
-![preview](https://via.placeholder.com/800x450/1e293b/60a5fa?text=e-klase+Palīgs+Preview)  
-*(drīzumā pievienošu īstu ekrānšāviņu)*
-
 ## Ko viņš prot
 1. Droši pieslēdzas tavam e-klase.lv kontam (parole redzama tikai tev)  
 2. Ar vienu klikšķi parāda šodienas un tuvāko dienu mājasdarbus  
